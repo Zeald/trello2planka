@@ -85,7 +85,8 @@ async function importCards(trelloList, plankaBoard, plankaList, {config, me, tre
             listId: plankaList.id,
             position: trelloCard.pos,
             name: getItemName(trelloCard),
-            description: trelloCard.desc || null
+            description: trelloCard.desc || null,
+            dueDate: trelloCard.due || undefined
         });
         reportCardMapping(trelloCard, plankaCard);
 
