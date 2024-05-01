@@ -58,14 +58,27 @@ export const createTask = async (task) => await authenticatedPost(API_TASKS, {':
 export const createComment = async (comment) => await authenticatedPost(API_COMMENTS, {':cardId': comment.cardId}, comment);
 
 export const createAttachment = async (cardId, fileName) => await authenticatedPostFileUpload(API_ATTACHMENTS, {':cardId': cardId}, fileName);
+const retryableErrorCodes = [408, 429, 502, 503, 504];
 
 const authenticatedPost = async (resource, parameters, body) => {
     const path = resolvePlankaPath(apiBase, resource, parameters);
     console.log('authenticated POST to ' + path);
-    const response = await fetch(path, {
-        method: 'POST',
-        ...headersAndBody(body)
-    });
+    let response;
+    let retryCount = 0;
+    while (retryCount < 3) {
+        response = await fetch(path, {
+            method: 'POST',
+            ...headersAndBody(body)
+        });
+        if (retryableErrorCodes.includes(response.status)) {
+            const waitTime = Math.pow(2, retryCount) * 1000;
+            console.log(`Retrying after ${waitTime}ms...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            retryCount++;
+        } else {
+            break;
+        }
+    }
     const {item, code, problems} = await response.json();
     if(!item || code || problems) {
         throw new Error(`authenticated POST failed, status code = ${response.status}, code = ${code}, problems = ${problems}`);
@@ -77,13 +90,25 @@ const authenticatedPost = async (resource, parameters, body) => {
 const authenticatedPostFileUpload = async (resource, parameters, fileName) => {
     const path = resolvePlankaPath(apiBase, resource, parameters);
     console.log('authenticated POST with file upload to ' + path);
-    const formData = new FormData();
-    formData.set('file', await blobFrom(ATTACHMENT_TMP_FILE), fileName);
-    const response = await fetch(path, {
-        method: 'POST',
-        body: formData,
-        ...getHeaders()
-    });
+    let response;
+    let retryCount = 0;
+    while (retryCount < 3) {
+        const formData = new FormData();
+        formData.set('file', await blobFrom(ATTACHMENT_TMP_FILE), fileName);
+        response = await fetch(path, {
+            method: 'POST',
+            body: formData,
+            ...getHeaders()
+        });
+        if (retryableErrorCodes.includes(response.status)) {
+            const waitTime = Math.pow(2, retryCount) * 1000;
+            console.log(`Retrying after ${waitTime}ms...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            retryCount++;
+        } else {
+            break;
+        }
+    }
     const {item, code, problems} = await response.json();
     if(!item || code || problems) {
         throw new Error(`authenticated POST failed, status code = ${response.status}, code = ${code}, problems = ${problems}`);
@@ -96,7 +121,19 @@ const authenticatedPostFileUpload = async (resource, parameters, fileName) => {
 const authenticatedGet = async (resource) =>  {
     const path = resolvePlankaPath(apiBase, resource, {});
     console.log('authenticated GET to ' + path);
-    const response = await fetch(path, {headers: { Authorization: 'Bearer ' + token }});
+    let response;
+    let retryCount = 0;
+    while (retryCount < 3) {
+        response = await fetch(path, {headers: { Authorization: 'Bearer ' + token }});
+        if (retryableErrorCodes.includes(response.status)) {
+            const waitTime = Math.pow(2, retryCount) * 1000;
+            console.log(`Retrying after ${waitTime}ms...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            retryCount++;
+        } else {
+            break;
+        }
+    }
     const {item, code, problems} = await response.json();
     if(!item || code || problems) {
         throw new Error(`authenticated GET failed, status code = ${response.status}, code = ${code}, problems = ${problems}`);
